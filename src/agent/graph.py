@@ -234,7 +234,6 @@ def build_agent(
         system_prompt=build_system_prompt(today or store.today),
     )
 
-
 def run_agent(
     query: str,
     *,
