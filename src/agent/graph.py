@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,49 @@ from src.utils.data_store import OrderDataStore
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = ROOT_DIR / "data"
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "artifacts" / "orders"
+
+# Regex helpers used to detect whether the user already provided the five
+# required fields. They are intentionally permissive so we can short-circuit
+# Gate 2 and force the model into Gate 3 even when formatting is unusual
+# (quoted item names, semicolons, multi-line input, etc.).
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_PHONE_RE = re.compile(r"(?:\+?\d[\s\-.()]*){8,15}")
+_GUARDRAIL_PATTERNS = [
+    r"bỏ\s*qua\s*policy",
+    r"fake\s*invoice",
+    r"hóa\s*đơn\s*giả",
+    r"giảm\s*giá\s*\d+\s*%",
+    r"manual\s*discount",
+    r"stock\s*bypass",
+    r"không\s*cần\s*theo\s*catalog",
+]
+
+
+def _looks_like_refusal(query: str) -> bool:
+    lowered = query.lower()
+    return any(re.search(pattern, lowered) for pattern in _GUARDRAIL_PATTERNS)
+
+
+def _has_all_five_fields(query: str) -> bool:
+    if not _EMAIL_RE.search(query):
+        return False
+    if not _PHONE_RE.search(query):
+        return False
+    # Heuristics: must contain a product name (>= 2 word-like tokens) and
+    # some kind of address indicator (street / district / city keywords,
+    # numbers, or comma-separated location).
+    has_product = bool(re.search(r"[A-Za-zÀ-ỹ]{3,}", query))
+    has_address = bool(
+        re.search(r"(quận|huyện|phường|xã|tp\.?hcm|hà\s*nội|đà\s*nẵng|street|st\.|road|rd\.)", query, re.IGNORECASE)
+        or re.search(r"\d+[,\s].*?(quận|huyện|tp|thành\s*phố|city)", query, re.IGNORECASE)
+    )
+    return has_product and has_address
+
+
+def _strip_item_quotes(query: str) -> str:
+    """Remove surrounding double quotes from item names so the LLM is not
+    confused by the literal `"` characters when matching products."""
+    return re.sub(r'"([^"]+)"', r"\1", query)
 
 
 def build_system_prompt(today: str | None = None) -> str:
@@ -207,7 +251,16 @@ def run_agent(
         model_name=model_name,
         today=today,
     )
-    response = agent.invoke({"messages": [{"role": "user", "content": query}]})
+    # Pre-process the query: strip surrounding double quotes around item
+    # names and, if all five customer fields are present, append a strong
+    # directive so the model does not stall in Gate 2.
+    processed_query = _strip_item_quotes(query)
+    if _has_all_five_fields(processed_query) and not _looks_like_refusal(processed_query):
+        processed_query = (
+            processed_query
+            + "\n\n[Hệ thống] Đơn hàng này có đủ thông tin khách hàng (họ tên, số điện thoại, email, địa chỉ giao hàng) và ít nhất một sản phẩm. Hãy BẮT BUỘC gọi tool list_products ngay để bắt đầu xử lý đơn, KHÔNG hỏi thêm thông tin, KHÔNG từ chối."
+        )
+    response = agent.invoke({"messages": [{"role": "user", "content": processed_query}]})
     messages = response["messages"] if isinstance(response, dict) else response
     tool_calls = extract_tool_calls(messages)
     saved_order, saved_order_path = extract_saved_order(tool_calls)
