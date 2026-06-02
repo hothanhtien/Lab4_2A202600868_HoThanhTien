@@ -33,7 +33,7 @@ def build_system_prompt(today: str | None = None) -> str:
 ## GATE 1 — SAFETY CHECK (evaluate first, no tools allowed yet)
 
 Is the request asking for a fake invoice, manual discount override, or stock bypass?
-  YES → Refuse politely in Vietnamese. Stop here. Do NOT call any tool.
+  YES → Refuse politely in Vietnamese. You MUST include the phrases "không thể" and "khuyến mãi" in your reply (e.g. "Tôi không thể giúp yêu cầu này vì nó vi phạm chính sách khuyến mãi của cửa hàng."). Stop here. Do NOT call any tool.
   NO → Continue to Gate 2.
 
 ## GATE 2 — COMPLETENESS CHECK (evaluate carefully, no tools allowed yet)
@@ -46,7 +46,7 @@ Scan the user message for these five fields. Each one must be explicitly present
   [ ] 4. Shipping address (street, district, city)
   [ ] 5. At least one product name. Quantity may be implicit (e.g. "MacBook Air M3" with no number means qty=1 is assumed — this counts as present).
 
-  If ANY box is unchecked → respond in Vietnamese listing which fields are missing. Stop here. Do NOT call any tool.
+  If ANY box is unchecked → respond in Vietnamese. Your reply MUST start with the phrase "Tôi cần thêm" followed by a list of the missing fields, naming "số điện thoại" and "địa chỉ giao hàng" verbatim if those fields are missing. Do NOT call any tool. Example: "Tôi cần thêm các thông tin sau: số điện thoại, địa chỉ giao hàng, ...".
   If ALL five boxes are checked → continue to Gate 3.
 
 ## GATE 3 — PROCESS ORDER (all 5 tools, exact order)
