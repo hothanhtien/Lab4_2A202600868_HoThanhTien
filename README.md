@@ -49,6 +49,15 @@ GOOGLE_API_KEY=...
 LLM_MODEL=gemini-2.5-flash
 ```
 
+To use OpenAI instead of Google, set the OpenAI key in `.env` (without committing it):
+
+```bash
+OPENAI_API_KEY=sk-...
+LLM_MODEL=gpt-4o-mini
+```
+
+> **Important:** Do NOT commit `.env` to GitHub. Make sure `.env` is listed in `.gitignore`.
+
 Optional local model:
 
 ```bash
