@@ -58,16 +58,25 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 ## Commands
 
+> **Note (Windows):** Set `PYTHONIOENCODING=utf-8` to avoid encoding issues with Vietnamese output.
+
 Run the weak baseline:
 
 ```bash
 python grade/scoring.py --module simple_solution.agent.graph --provider google
 ```
 
-Run your implementation:
+Run your implementation (Google):
 
 ```bash
 python grade/scoring.py --module src.agent.graph --provider google
+```
+
+Run your implementation (OpenAI):
+
+```powershell
+$env:PYTHONIOENCODING="utf-8"
+python grade/scoring.py --module src.agent.graph --provider openai --model-name gpt-4o-mini --today 2026-06-01
 ```
 
 Run tests:
